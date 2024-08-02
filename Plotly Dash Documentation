@@ -1,0 +1,266 @@
+# This Python 3 environment comes with many helpful analytics libraries installed
+# It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+# For example, here's several helpful packages to load
+
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+
+# Input data files are available in the read-only "../input/" directory
+# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+# You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+# You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+pip install dash
+pip install dash_bootstrap_components
+import pandas as pd
+
+#Using plotly as the visualization package.
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+from dash import Dash, dcc, html, Input, Output,callback
+
+#for formatting, we will import the dash bootstrap components.
+import dash_bootstrap_components as dbc
+app = Dash(
+    __name__, 
+    external_stylesheets=[dbc.themes.LUMEN]
+)
+def tab_name(tab_contents,label):
+    return dbc.Tab(
+        tab_contents, 
+        label = label, 
+        activeLabelClassName="alert-warning",
+    )  
+def card(name):
+    return dbc.CardHeader([
+       html.Div([
+                    html.H2(
+                        name, 
+                        className="mt-4 px-4 align-center"), 
+                ]),
+            ])
+def dropdown(label,options):
+    return dbc.Col([
+                html.Div([
+                    dbc.Label(label, className="pl-4"),
+                    options,
+                ], className="col-6")
+            ], className="my-4")
+def dcc_dropdown(options,first_value,id):
+    return dcc.Dropdown(
+        
+    options=options,
+    value=first_value,
+    id = id,
+    clearable=False
+)
+def tab_graph(graphheading,graph):
+    return dbc.Col([
+                html.Div([
+                    html.H5(graphheading, className="text-center mt-4 py-2 alert-secondary"), 
+                ]),
+                graph
+    ])
+unempl = pd.read_csv('/kaggle/input/interactive-dash-boards-using-python-and-plotly/Output_rates_file.csv')
+unempl.head()
+unempl.head(10)
+unempl.info()
+unempl.describe()
+unempl.tail()
+unempl.isnull()
+unempl.isnull().sum()
+unempl.columns
+housing_hpi = pd.read_csv('/kaggle/input/interactive-dash-boards-using-python-and-plotly/Housing_Output_Hpi.csv')
+housing_tier = pd.read_csv('/kaggle/input/interactive-dash-boards-using-python-and-plotly/Housing_Output 2_top_bottom.csv')
+housing_hpi['observation_date'] = pd.to_datetime(housing_hpi['observation_date'],format = '%d-%m-%Y')
+housing_hpi = housing_hpi.sort_values('observation_date')
+housing_tier['observation_date'] = pd.to_datetime(housing_tier['observation_date'],format = '%d-%m-%Y')
+housing_tier = housing_tier.sort_values('observation_date')
+#housing_hpi.tail(10)
+#housing_tier.head()
+housing_tier.rename(columns = {'RegionName':'State'},inplace=True)
+housing_tier['Housing Types'] = housing_tier['Housing Types'].replace({'Top Quantile House Vales':'Top Quantile House Price',
+                                                                       'Bottom Quantile House Values':'Bottom Quantile House Price'})
+housing_hpi['State'] = housing_hpi['State'].replace({'NewYork':'New York'})
+housing_tier.info()
+housing_hpi.head()
+housing_hpi_recess = housing_hpi[(housing_hpi['observation_date'] >= '2004') & (housing_hpi['observation_date'] <= '2014')]
+housing_tier_recess = housing_tier[(housing_tier['observation_date'] >= '2004') & (housing_tier['observation_date'] <= '2014')]
+def indicator(num):
+        if num.year <= 2007:
+            return "Pre Recession"
+ 
+        elif num.year >= 2008 and num.year < 2012:
+            return "During Recession"
+ 
+        else:
+            return "Post Recession"
+
+housing_hpi_recess['Indicator'] = housing_hpi_recess['observation_date'].apply(lambda date : indicator(date))
+housing_tier_recess['Indicator'] = housing_tier_recess['observation_date'].apply(lambda date : indicator(date))
+
+housing_hpi_recess.tail()
+housing_tier_recess.head()
+housing_state = list(housing_hpi_recess['State'].sort_values().unique())
+#housing_tier_recess['State'].sort_values().unique() #== housing_hpi_recess['State'].sort_values().unique()
+list(housing_hpi_recess['Indicator'].sort_values().unique())[1]
+def line_graph_house(df,selected_state,cat_column,x,y):    
+    df =df[(df['State'] == selected_state)] 
+    df_pre = df[df['Indicator'] == list(df['Indicator'].sort_values().unique())[2]]  
+    df_dur = df[df['Indicator'] == list(df['Indicator'].sort_values().unique())[0]] 
+    df_post = df[df['Indicator'] == list(df['Indicator'].sort_values().unique())[1]]
+    fig = make_subplots(rows=1, cols=3,shared_yaxes=True,subplot_titles=(list(df['Indicator'].sort_values().unique())[2],list(df['Indicator'].sort_values().unique())[0],list(df['Indicator'].sort_values().unique())[1]),x_title="Year",
+                        y_title="House Price")
+        
+    for type in df_pre[cat_column].unique():
+        data_1 = df_pre[df_pre[cat_column] == type]
+        fig.add_trace(go.Scatter(x=data_1[x], y=data_1[y], mode='lines',name = type),
+                                row=1, col=1)
+        
+    for type2 in df_dur[cat_column].unique():
+        data_2 = df_dur[df_dur[cat_column] == type2]
+        fig.add_trace(go.Scatter(x=data_2[x], y=data_2[y], mode='lines',name = type2),
+                                row=1, col=2)
+        
+    for type3 in df_post[cat_column].unique():
+        data_3 = df_post[df_post[cat_column] == type3]
+        fig.add_trace(go.Scatter(x=data_3[x], y=data_3[y], mode='lines',name = type3),
+                                row=1, col=3)
+    fig.update_layout(title='House Price values' + ' in ' + selected_state, showlegend=True)            
+    
+    return fig
+line_graph_house(housing_tier_recess,
+                 'Texas',
+                 'Housing Types',
+                 'observation_date',
+                 'House Values')
+def hpiline_graph_house(df,selected_state,cat,x,y):
+      df =df[(df['State'] == selected_state) & (df['Housing'] == cat)] 
+      df_fig = px.line(df,
+                  x = x,
+                  y = y,
+                  color = 'Indicator',
+                  symbol= 'Indicator',
+                  title= 'House Price Index ' +'in ' + selected_state
+                  )
+      df_fig.update_layout(   xaxis=dict(title='Year' ),
+                              yaxis=dict(title='House Price Index')
+      )
+      return df_fig
+hpiline_graph_house(housing_hpi_recess,
+                'Texas',
+                'HPI',
+                'observation_date',
+                'Housing Values')
+def home_analy_line(df,select_home_type,cat,x,y):
+    df =df[df[cat] == select_home_type] 
+    
+    anay_all = px.line(df,
+                  x = x,
+                  y = y,
+                  color = 'State',
+                  symbol = 'State',
+                  title=  'State-wise ' + select_home_type + ' Comparision'
+                  )
+    return anay_all
+home_analy_line(housing_tier_recess,'Top Quantile House Price','Housing Types','observation_date','House Values')
+#housing_tier_recess['Housing Types'].unique()
+
+def home_analy_box(df,year1,year2,select_cat):
+     df = df[(df['observation_date'] >= year1) & (df['observation_date'] <= year2)]
+     df = df[df['Housing']== select_cat]
+     analy_box = px.box(df,
+                  x = 'State',
+                  y = 'Housing Values',
+                  color = 'State',
+                  notched= True,
+                  title=  'State-wise ' + select_cat + '('+ year1 +'-'+ year2+')'
+                  )
+     return analy_box
+home_analy_box(housing_hpi,'2020','2021','Housing Permits')
+economic_dim = pd.read_csv('/kaggle/input/interactive-dash-boards-using-python-and-plotly/Output_Economic_well_being.csv')
+economic_dim['observation_date'] = pd.to_datetime(economic_dim['observation_date'],format = '%d-%m-%Y')
+economic_dim = economic_dim.sort_values('observation_date')
+economic_dim.info()
+
+economic_dim_recess = economic_dim[(economic_dim['observation_date'] >= '2005') & (economic_dim['observation_date'] <= '2014')]
+def indicator(num):
+        if num.year <= 2006:
+            return "Pre Recession"
+ 
+        elif num.year >= 2007 and num.year < 2010:
+            return "During Recession"
+ 
+        else:
+            return "Post Recession"
+        
+economic_dim_recess['Indicator'] = economic_dim_recess['observation_date'].apply(lambda date : indicator(date))
+
+def indicator_1(num):
+        if num.year <= 2017:
+            return "Pre Covid"
+ 
+        elif num.year >= 2018 and num.year < 2021:
+            return "During Covid"
+ 
+        else:
+            return "Post Covid"
+economic_dim_covid = economic_dim[(economic_dim['observation_date'] >= '2016') & (economic_dim['observation_date'] <= '2022')]
+economic_dim_covid['Indicator'] = economic_dim_covid['observation_date'].apply(lambda date : indicator_1(date))
+economic_dim_recess.tail()
+def bar_graph_econ(df,selected_state,cat,x,y):
+      df =df[(df['State'] == selected_state) & (df['Economic Indicator'] == cat)] 
+      df_fig = px.bar(df,
+                  x = x,
+                  y = y,
+                  color = 'Indicator',
+                  title= 'Minimum Wage ' +'in ' + selected_state
+                  )
+      df_fig.update_layout(   xaxis=dict(title='Year' ),
+                              yaxis=dict(title='Minimum Wage')
+      )
+      return df_fig
+bar_graph_econ(economic_dim_recess,
+               'Florida',
+               'Minimum Wage',
+               'observation_date',
+               'Value')
+def line_graph_econ(df,selected_state,cat,x,y):
+      df =df[(df['State'] == selected_state) & (df['Economic Indicator'] == cat)] 
+      df_fig = px.line(df,
+                  x = x,
+                  y = y,
+                  color = 'Indicator',
+                  symbol= 'Indicator',
+                  title= cat +' in ' + selected_state
+                  )
+      df_fig.update_layout(   xaxis=dict(title='Year' ),
+                              yaxis=dict(title=cat)
+      )
+      return df_fig
+line_graph_econ(economic_dim_recess,
+                'Texas',
+                'Total Personal Income',
+               'observation_date',
+               'Value')
+
+def econ_analy_box(df,selected_state,cat):
+     df = df[(df['State'] == selected_state) & (df['Economic Indicator'] == cat)]
+     analy_box = px.box(df,
+                  x = 'Indicator',
+                  y = 'Value',
+                  color = 'Indicator',
+                  notched= True,
+                  title=  'Civil Labor Force ' +'in ' + selected_state
+                  )
+     return analy_box
+econ_analy_box(economic_dim_recess,
+               'New York',
+               'Civil Labor Force')
